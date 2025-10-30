@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Conservation Tracker - Goal Setting</title>
+
+  <style>
+    /* General Reset and Body Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      background-color: #f4f4f9;
+    }
+
+    /* Title Section */
+    .title-section {
+      margin-top: 2rem;
+      text-align: center;
+      color: #00796b;
+    }
+
+    .title-section h1 {
+      font-size: 2.5rem;
+      font-weight: bold;
+    }
+
+    /* Goal Setting Container */
+    .goal-setting-container {
+      max-width: 600px;
+      width: 100%;
+      padding: 2rem;
+      margin-top: 1.5rem;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+
+    .goal-setting-container h3 {
+      font-size: 1.5rem;
+      color: #333333;
+      margin-bottom: 1rem;
+    }
+
+    /* Input Styles */
+    .input-field {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.5rem 0;
+      border: 1px solid #cccccc;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+
+    /* Button Styles */
+    .form-button {
+      padding: 0.8rem 1.5rem;
+      background-color: #00796b;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin: 0.5rem 0;
+    }
+
+    .form-button:hover {
+      background-color: #004d40;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      width: 100%;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      margin: 1rem 0;
+    }
+
+    .progress-fill {
+      height: 20px;
+      background-color: #00796b;
+      width: 0%;
+      border-radius: 10px;
+      text-align: center;
+      color: white;
+      font-weight: bold;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title-section">
+    <h1>Water Conservation Tracker</h1>
+    <p style="margin-top: 0.5rem;"><a href="web.html" style="color:#00796b; text-decoration:none;">Back to Login</a></p>
+  </div>
+
+  <div class="goal-setting-container">
+    <h3>Set Your Monthly Water Conservation Goal</h3>
+    <input type="number" id="goalInput" class="input-field" placeholder="Enter Monthly Goal (liters)">
+    <button onclick="setGoal()" class="form-button">Set Goal</button>
+
+    <h3>Track Your Water Usage</h3>
+    <input type="number" id="usageInput" class="input-field" placeholder="Add Daily Usage (liters)">
+    <button onclick="addUsage()" class="form-button">Add Usage</button>
+
+    <div class="progress-bar">
+      <div id="progressFill" class="progress-fill">0%</div>
+    </div>
+    <p id="progressText">Usage: 0 / 0 liters</p>
+
+    <button onclick="resetGoal()" class="form-button">Reset Goal</button>
+  </div>
+
+  <script>
+    let goal = 0;
+    let currentUsage = 0;
+
+    async function loadProgress() {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        window.location.href = "web.html";
+        return;
+      }
+      try {
+        const res = await fetch(`/progress/${userId}`);
+        const data = await res.json();
+        goal = Number(data.goal) || 0;
+        currentUsage = Number(data.total) || 0;
+        document.getElementById("goalInput").value = goal ? String(goal) : '';
+        updateProgress();
+      } catch (err) {
+        console.error(err);
+        alert("Could not load progress. Please try again.");
+      }
+    }
+
+    async function setGoal() {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        window.location.href = "web.html";
+        return;
+      }
+      const goalInput = parseInt(document.getElementById("goalInput").value);
+      if (isNaN(goalInput) || goalInput < 0) {
+        alert("Please enter a valid goal (0 or positive).");
+        return;
+      }
+      try {
+        const res = await fetch('/set_goal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: Number(userId), monthly_goal: goalInput })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Goal saved' : 'Failed to save goal'));
+        if (res.ok) {
+          await loadProgress();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Could not save goal. Please try again.');
+      }
+    }
+
+    async function addUsage() {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        window.location.href = "web.html";
+        return;
+      }
+      const usageInput = parseInt(document.getElementById("usageInput").value);
+      if (isNaN(usageInput) || usageInput <= 0) {
+        alert("Please enter a positive usage amount.");
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const res = await fetch('/add_water_usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: Number(userId), usage_date: today, usage_amount: usageInput })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Usage added' : 'Failed to add usage'));
+        if (res.ok) {
+          document.getElementById("usageInput").value = '';
+          await loadProgress();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Could not add usage. Please try again.');
+      }
+    }
+
+    function updateProgress() {
+      const progressPercentage = goal > 0 ? (currentUsage / goal) * 100 : 0;
+      document.getElementById("progressFill").style.width = Math.min(progressPercentage, 100) + "%";
+      document.getElementById("progressFill").textContent = Math.floor(progressPercentage) + "%";
+      document.getElementById("progressText").textContent = `Usage: ${currentUsage} / ${goal} liters`;
+      if (currentUsage >= goal && goal > 0) {
+        alert("🎉 Congratulations! You've reached your water conservation goal for the month!");
+      }
+    }
+
+    async function resetGoal() {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        window.location.href = "web.html";
+        return;
+      }
+      try {
+        const res = await fetch('/set_goal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: Number(userId), monthly_goal: 0 })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Goal reset' : 'Failed to reset goal'));
+        if (res.ok) {
+          await loadProgress();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Could not reset goal. Please try again.');
+      }
+    }
+
+    // Load when page is ready
+    window.addEventListener('DOMContentLoaded', loadProgress);
+  </script>
+</body>
+</html>
